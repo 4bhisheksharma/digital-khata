@@ -52,3 +52,4 @@ app.*.map.json
 /.metadata
 /analysis_options.yaml
 /digital_khata.iml
+/project_description.txt

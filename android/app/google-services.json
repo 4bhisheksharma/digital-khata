@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "23112280246",
+    "project_id": "digital-khata-63c4d",
+    "storage_bucket": "digital-khata-63c4d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:23112280246:android:384b4c1d96d5b523081e17",
+        "android_client_info": {
+          "package_name": "com.abhisheksharma.digital_khata"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7FuD02Lk4-PPQABRSXcoZ-rUSb8yLzE8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

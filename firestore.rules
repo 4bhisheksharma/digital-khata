@@ -1,0 +1,10 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read/write access to all customers
+    match /customers/{customerId} {
+      allow read, write: if true;  // For now, allow all access. In production, you should add authentication.
+    }
+  }
+}

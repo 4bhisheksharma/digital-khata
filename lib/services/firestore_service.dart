@@ -1,146 +1,162 @@
-import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:nepali_utils/nepali_utils.dart';
 import '../models/customer.dart';
 import '../models/business_summary.dart';
 
 class FirestoreService {
-  final _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Generate a unique 4-digit customer ID
+  Future<String> generateUniqueCustomerId() async {
+    final random = DateTime.now().millisecondsSinceEpoch;
+    final id = (1000 + (random % 9000)).toString();
+
+    try {
+      final doc = await _firestore
+          .collection('customers')
+          .where('uniqueId', isEqualTo: id)
+          .get();
+
+      if (doc.docs.isEmpty) {
+        return id;
+      } else {
+        // If collision, generate a new random 6-digit ID
+        final newId = (100000 + (random % 900000)).toString();
+        return newId;
+      }
+    } catch (e) {
+      print('Error generating unique customer ID: $e');
+      // Fallback to timestamp string
+      return DateTime.now().millisecondsSinceEpoch.toString();
+    }
+  }
+
+  // Add new customer
+  Future<Customer> addCustomer(
+    String name,
+    String? phone,
+    String? address,
+  ) async {
+    try {
+      final uniqueId = await generateUniqueCustomerId();
+      final now = NepaliDateTime.now();
+      final nepaliDate = now.toString();
+
+      final docRef = await _firestore.collection('customers').add({
+        'name': name,
+        'phone': phone,
+        'address': address,
+        'uniqueId': uniqueId,
+        'totalDue': 0.0,
+        'createdAt': Timestamp.fromDate(now.toDateTime()),
+        'nepaliCreatedDate': nepaliDate,
+        'transactions': [],
+      });
+
+      final createdDoc = await docRef.get();
+      print('Customer added with ID: ${docRef.id}, uniqueId: $uniqueId');
+      return Customer.fromSnapshot(createdDoc);
+    } catch (e, stacktrace) {
+      print('Error adding customer: $e');
+      print('Stacktrace: $stacktrace');
+      rethrow;
+    }
+  }
 
   // Get stream of all customers
   Stream<List<Customer>> fetchCustomers() {
-    return _firestore.collection('customers').snapshots().map((snapshot) {
-      try {
-        return snapshot.docs
-            .map((doc) => Customer.fromMap(doc.data()))
-            .where(
-              (customer) => customer.id.isNotEmpty,
-            ) // Filter out invalid data
-            .toList();
-      } catch (e) {
-        print('Error fetching customers: $e');
-        return <Customer>[];
-      }
-    });
+    try {
+      return _firestore
+          .collection('customers')
+          .orderBy('name')
+          .snapshots()
+          .handleError((error) {
+            print('Error in customers stream: $error');
+            return [];
+          })
+          .map((snapshot) {
+            try {
+              return snapshot.docs
+                  .map((doc) {
+                    try {
+                      return Customer.fromSnapshot(doc);
+                    } catch (e) {
+                      print('Error parsing customer doc ${doc.id}: $e');
+                      return null;
+                    }
+                  })
+                  .where((customer) => customer != null)
+                  .cast<Customer>()
+                  .toList();
+            } catch (e) {
+              print('Error mapping customer documents: $e');
+              return <Customer>[];
+            }
+          });
+    } catch (e) {
+      print('Error setting up customers stream: $e');
+      return Stream.value(<Customer>[]);
+    }
   }
 
-  // Get top due customers
-  Future<List<Customer>> getTopDueCustomers() async {
+  // Get customer by unique ID
+  Future<Customer?> getCustomerByUniqueId(String uniqueId) async {
     try {
-      final snapshot = await _firestore.collection('customers').get();
+      final snapshot = await _firestore
+          .collection('customers')
+          .where('uniqueId', isEqualTo: uniqueId)
+          .get();
+
       if (snapshot.docs.isEmpty) {
-        return [];
+        return null;
       }
 
-      final customers = snapshot.docs
-          .map((doc) => Customer.fromMap(doc.data()))
-          .where(
-            (customer) => customer.id.isNotEmpty,
-          ) // Filter out invalid data
-          .toList();
-
-      // Sort by total dues in descending order
-      customers.sort((a, b) => b.totalDues.compareTo(a.totalDues));
-
-      // Return only customers with dues > 0, limited to top 10
-      return customers
-          .where((customer) => customer.totalDues > 0)
-          .take(10)
-          .toList();
+      final doc = snapshot.docs.first;
+      return Customer.fromSnapshot(doc);
     } catch (e) {
-      print('Error getting top due customers: $e');
-      return [];
+      print('Error getting customer by unique ID: $e');
+      return null;
     }
   }
 
-  // Get business summary
-  Future<BusinessSummary> getBusinessSummary() async {
-    try {
-      final customersSnapshot = await _firestore.collection('customers').get();
-      if (customersSnapshot.docs.isEmpty) {
-        return BusinessSummary(
-          totalCustomers: 0,
-          totalTransactions: 0,
-          totalDueAmount: 0,
-          todaysTransactions: 0,
-        );
-      }
-
-      final customers = customersSnapshot.docs
-          .map((doc) => Customer.fromMap(doc.data()))
-          .where(
-            (customer) => customer.id.isNotEmpty,
-          ) // Filter out invalid data
-          .toList();
-
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-
-      int totalTransactions = 0;
-      int todaysTransactions = 0;
-      double totalDueAmount = 0;
-
-      for (final customer in customers) {
-        totalTransactions += customer.transactions.length;
-        totalDueAmount += customer.totalDues;
-
-        // Count today's transactions
-        todaysTransactions += customer.transactions.where((transaction) {
-          final txDate = transaction.timestamp;
-          return txDate.isAfter(today);
-        }).length;
-      }
-
-      return BusinessSummary(
-        totalCustomers: customers.length,
-        totalTransactions: totalTransactions,
-        totalDueAmount: totalDueAmount,
-        todaysTransactions: todaysTransactions,
-      );
-    } catch (e) {
-      print('Error getting business summary: $e');
-      return BusinessSummary(
-        totalCustomers: 0,
-        totalTransactions: 0,
-        totalDueAmount: 0,
-        todaysTransactions: 0,
-      );
-    }
-  }
-
-  // Get stream of customer's transactions
-  Stream<List<Transaction>> fetchTransactions(String customerId) {
-    return _firestore.collection('customers').doc(customerId).snapshots().map((
-      doc,
-    ) {
-      try {
-        return doc.exists ? Customer.fromMap(doc.data()).transactions : [];
-      } catch (e) {
-        print('Error fetching transactions: $e');
-        return <Transaction>[];
-      }
-    });
-  }
-
-  // Add a new transaction
+  // Add transaction for customer
   Future<void> addTransaction(
     String customerId,
-    Transaction transaction,
+    String productName,
+    double price,
+    double dueAmount,
   ) async {
     try {
       final customerRef = _firestore.collection('customers').doc(customerId);
+      final now = NepaliDateTime.now();
+      final nepaliDate = now.toString();
+      final transactionId = DateTime.now().millisecondsSinceEpoch.toString();
 
-      return _firestore.runTransaction((txn) async {
-        final customerDoc = await txn.get(customerRef);
+      // First get the current customer data
+      final customerDoc = await customerRef.get();
+      if (!customerDoc.exists) {
+        throw Exception('Customer not found');
+      }
 
-        if (!customerDoc.exists) {
-          throw Exception('Customer not found');
-        }
+      final currentDue = (customerDoc.data()?['totalDue'] ?? 0.0) as double;
+      final newTransaction = {
+        'id': transactionId,
+        'productName': productName,
+        'price': price,
+        'dueAmount': dueAmount,
+        'date': Timestamp.fromDate(now.toDateTime()),
+        'nepaliDate': nepaliDate,
+      };
 
-        final customer = Customer.fromMap(customerDoc.data());
-        final updatedTransactions = [...customer.transactions, transaction];
+      final transactions = List<Map<String, dynamic>>.from(
+        customerDoc.data()?['transactions'] ?? [],
+      );
+      transactions.add(newTransaction);
 
-        txn.update(customerRef, {
-          'transactions': updatedTransactions.map((tx) => tx.toMap()).toList(),
-        });
+      // Update the customer document
+      await customerRef.update({
+        'totalDue': currentDue + dueAmount,
+        'transactions': transactions,
       });
     } catch (e) {
       print('Error adding transaction: $e');
@@ -148,16 +164,60 @@ class FirestoreService {
     }
   }
 
-  // Add a new customer
-  Future<void> addCustomer(Customer customer) async {
+  // Get business summary
+  Future<BusinessSummary> getBusinessSummary() async {
     try {
-      return await _firestore
-          .collection('customers')
-          .doc(customer.id)
-          .set(customer.toMap());
+      final now = NepaliDateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final customersSnapshot = await _firestore.collection('customers').get();
+
+      double totalDueAmount = 0.0;
+      int totalTransactions = 0;
+      int todaysTransactions = 0;
+
+      for (var doc in customersSnapshot.docs) {
+        final data = doc.data();
+        totalDueAmount += (data['totalDue'] ?? 0.0);
+        final transactions = (data['transactions'] as List?) ?? [];
+        totalTransactions += transactions.length;
+
+        todaysTransactions += transactions.where((transaction) {
+          final txDate = transaction['date'] as Timestamp;
+          return txDate.toDate().isAfter(today);
+        }).length;
+      }
+
+      return BusinessSummary(
+        totalDueAmount: totalDueAmount,
+        totalCustomers: customersSnapshot.size,
+        totalTransactions: totalTransactions,
+        todaysTransactions: todaysTransactions,
+      );
     } catch (e) {
-      print('Error adding customer: $e');
-      rethrow;
+      print('Error getting business summary: $e');
+      return BusinessSummary(
+        totalDueAmount: 0.0,
+        totalCustomers: 0,
+        totalTransactions: 0,
+        todaysTransactions: 0,
+      );
+    }
+  }
+
+  // Get top due customers
+  Future<List<Customer>> getTopDueCustomers() async {
+    try {
+      final snapshot = await _firestore
+          .collection('customers')
+          .orderBy('totalDue', descending: true)
+          .where('totalDue', isGreaterThan: 0)
+          .limit(10)
+          .get();
+
+      return snapshot.docs.map((doc) => Customer.fromSnapshot(doc)).toList();
+    } catch (e) {
+      print('Error getting top due customers: $e');
+      return [];
     }
   }
 }

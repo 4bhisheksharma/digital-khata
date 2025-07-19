@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/customer.dart';
 import '../services/firestore_service.dart';
 import '../utils/nepali_strings.dart';
+import '../theme/app_theme.dart';
 
 class AddCustomerForm extends StatefulWidget {
   const AddCustomerForm({super.key});
@@ -30,27 +31,28 @@ class _AddCustomerFormState extends State<AddCustomerForm> {
           listen: false,
         );
 
-        // Generate a 4-digit ID
-        final id = (1000 + DateTime.now().millisecondsSinceEpoch % 9000)
-            .toString();
+        print('Attempting to add customer: ${_nameController.text.trim()}');
 
-        final customer = Customer(
-          id: id,
-          name: _nameController.text.trim(),
-          phone: _phoneController.text.trim(),
-          address: _addressController.text.trim(),
+        // Add customer with name, phone, and address and get created document
+        final customer = await firestoreService.addCustomer(
+          _nameController.text.trim(),
+          _phoneController.text.trim(),
+          _addressController.text.trim(),
         );
 
-        await firestoreService.addCustomer(customer);
+        print('Customer created: ${customer.id}');
 
         if (!mounted) return;
         Navigator.pop(context, customer);
-      } catch (e) {
+      } catch (e, stacktrace) {
+        print('Error in AddCustomerForm: $e');
+        print('Stacktrace: $stacktrace');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            backgroundColor: AppTheme.errorColor,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       } finally {
@@ -74,15 +76,15 @@ class _AddCustomerFormState extends State<AddCustomerForm> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.fromLTRB(
+        24,
         16,
-        16,
-        16,
-        MediaQuery.of(context).viewInsets.bottom + 16,
+        24,
+        MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: Form(
         key: _formKey,
@@ -90,34 +92,58 @@ class _AddCustomerFormState extends State<AddCustomerForm> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
             // Form Title with Icon
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.person_add_rounded,
-                  color: Theme.of(context).primaryColor,
-                  size: 28,
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.person_add_rounded,
+                    color: AppTheme.primaryColor,
+                    size: 24,
+                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Text(
                   NepaliStrings.addCustomer,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Theme.of(context).primaryColor,
-                    fontWeight: FontWeight.bold,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AppTheme.textPrimaryColor,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
             // Name Field
             TextFormField(
               controller: _nameController,
               decoration: InputDecoration(
                 labelText: NepaliStrings.customerName,
-                prefixIcon: const Icon(Icons.person_outline),
-                border: const OutlineInputBorder(),
+                prefixIcon: Icon(
+                  Icons.person_outline,
+                  color: AppTheme.primaryColor,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               textCapitalization: TextCapitalization.words,
               validator: (value) {
@@ -130,15 +156,20 @@ class _AddCustomerFormState extends State<AddCustomerForm> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // Phone Field
             TextFormField(
               controller: _phoneController,
               decoration: InputDecoration(
                 labelText: NepaliStrings.phone,
-                prefixIcon: const Icon(Icons.phone_outlined),
-                border: const OutlineInputBorder(),
+                prefixIcon: Icon(
+                  Icons.phone_outlined,
+                  color: AppTheme.primaryColor,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               keyboardType: TextInputType.phone,
               validator: (value) {
@@ -150,25 +181,38 @@ class _AddCustomerFormState extends State<AddCustomerForm> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // Address Field
             TextFormField(
               controller: _addressController,
               decoration: InputDecoration(
                 labelText: NepaliStrings.address,
-                prefixIcon: const Icon(Icons.location_on_outlined),
-                border: const OutlineInputBorder(),
+                prefixIcon: Icon(
+                  Icons.location_on_outlined,
+                  color: AppTheme.primaryColor,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               textCapitalization: TextCapitalization.words,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
             // Submit Button
             SizedBox(
-              height: 50,
+              height: 52,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _submitForm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
                 child: _isLoading
                     ? const SizedBox(
                         height: 24,
@@ -184,8 +228,14 @@ class _AddCustomerFormState extends State<AddCustomerForm> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Icon(Icons.save_rounded),
-                          const SizedBox(width: 8),
-                          Text(NepaliStrings.save),
+                          const SizedBox(width: 12),
+                          Text(
+                            NepaliStrings.save,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
               ),

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/customer.dart';
 import '../services/firestore_service.dart';
-import '../services/test_data_service.dart';
 import '../widgets/customer_list_tile.dart';
 import '../widgets/add_customer_form.dart';
+import '../theme/app_theme.dart';
+import '../utils/nepali_strings.dart';
 import 'customer_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,12 +17,24 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _showAddCustomerSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Padding(
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
@@ -29,7 +42,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ).then((customer) {
       if (customer != null) {
-        // Navigate to customer detail screen
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -40,152 +52,43 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _showDataViewer() {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          width: double.maxFinite,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Firebase Data Viewer',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const Divider(),
-              Expanded(
-                child: StreamBuilder<List<Customer>>(
-                  stream: Provider.of<FirestoreService>(
-                    context,
-                  ).fetchCustomers(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return Text('Error: ${snapshot.error}');
-                    }
-                    if (!snapshot.hasData) {
-                      return const CircularProgressIndicator();
-                    }
-
-                    return ListView.builder(
-                      itemCount: snapshot.data!.length,
-                      itemBuilder: (context, index) {
-                        final customer = snapshot.data![index];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Document ID: ${customer.id}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text('Name: ${customer.name}'),
-                                Text('Total Dues: ₨ ${customer.totalDues}'),
-                                Text(
-                                  'Transactions: ${customer.transactions.length}',
-                                ),
-                                if (customer.transactions.isNotEmpty) ...[
-                                  const Divider(),
-                                  const Text('Transactions:'),
-                                  ...customer.transactions.map(
-                                    (tx) => Padding(
-                                      padding: const EdgeInsets.only(left: 16),
-                                      child: Text(
-                                        '- ${tx.productName}: ₨ ${tx.price} (Due: ₨ ${tx.dueAmount})',
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final firestoreService = Provider.of<FirestoreService>(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Digital खाता',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        actions: [
-          // Initialize test data
-          IconButton(
-            icon: const Icon(Icons.add_box),
-            onPressed: () async {
-              try {
-                await TestDataService.initializeTestData();
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Test data initialized successfully!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error initializing test data: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            tooltip: 'Add Test Data',
-          ),
-          // Debug menu
-          IconButton(
-            icon: const Icon(Icons.data_array),
-            onPressed: _showDataViewer,
-            tooltip: 'View Firebase Data',
-          ),
-        ],
-      ),
       body: Column(
         children: [
           // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
             child: TextField(
+              controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search by 4-digit ID or name...',
-                prefixIcon: const Icon(Icons.search),
+                hintText: NepaliStrings.search,
+                prefixIcon: Icon(Icons.search, color: AppTheme.primaryColor),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: AppTheme.primaryColor,
+                    width: 2,
+                  ),
+                ),
                 filled: true,
+                fillColor: Colors.white,
               ),
               onChanged: (value) {
                 setState(() {
@@ -194,13 +97,29 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           ),
-          // Customer List
           Expanded(
             child: StreamBuilder<List<Customer>>(
               stream: firestoreService.fetchCustomers(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: AppTheme.errorColor,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Error: ${snapshot.error}',
+                          style: TextStyle(color: AppTheme.errorColor),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
                 }
 
                 if (!snapshot.hasData) {
@@ -208,28 +127,50 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
 
                 final customers = snapshot.data!;
-
-                // Filter customers based on search query
-                final filteredCustomers = customers.where((customer) {
-                  final name = customer.name.toLowerCase();
-                  final id = customer.id;
-                  return name.contains(_searchQuery) ||
-                      id.contains(_searchQuery);
-                }).toList();
+                final filteredCustomers = _searchQuery.isEmpty
+                    ? customers
+                    : customers.where((customer) {
+                        final name = customer.name.toLowerCase();
+                        final id = customer.uniqueId.toLowerCase();
+                        return name.contains(_searchQuery) ||
+                            id.contains(_searchQuery);
+                      }).toList();
 
                 if (filteredCustomers.isEmpty) {
-                  if (_searchQuery.isEmpty) {
-                    return const Center(
-                      child: Text('No customers yet. Add your first customer!'),
-                    );
-                  } else {
-                    return const Center(
-                      child: Text('No matching customers found.'),
-                    );
-                  }
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.person_search,
+                            size: 48,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _searchQuery.isEmpty
+                              ? 'No customers yet'
+                              : 'No customers found',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                color: AppTheme.textPrimaryColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
+                  );
                 }
 
                 return ListView.builder(
+                  padding: const EdgeInsets.all(16),
                   itemCount: filteredCustomers.length,
                   itemBuilder: (context, index) {
                     final customer = filteredCustomers[index];
@@ -252,9 +193,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddCustomerSheet,
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.person_add_rounded),
+        label: Text(NepaliStrings.addCustomer),
       ),
     );
   }

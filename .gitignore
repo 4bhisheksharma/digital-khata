@@ -53,3 +53,12 @@ app.*.map.json
 /analysis_options.yaml
 /digital_khata.iml
 /project_description.txt
+
+# Security sensitive files
+.env
+/lib/config/firebase_config.dart
+/lib/config/firebase_options.dart
+/android
+/ios
+/.vscode
+/test

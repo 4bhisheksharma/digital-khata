@@ -32,4 +32,4 @@ flutter:
   fonts:
     - family: Kalimati
       fonts:
-        - asset: assets/fonts/Kalimati.ttf
+        - asset: assets/fonts/Kalimati.otf

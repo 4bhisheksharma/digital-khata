@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:nepali_utils/nepali_utils.dart';
 import '../models/customer.dart';
+import '../utils/nepali_strings.dart';
 import '../widgets/transaction_tile.dart';
 import '../widgets/add_transaction_form.dart';
+import '../theme/app_theme.dart';
 
 class CustomerDetailScreen extends StatelessWidget {
   final Customer customer;
@@ -12,7 +14,10 @@ class CustomerDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${customer.name} • ${customer.id}')),
+      appBar: AppBar(
+        title: Text('${customer.name} • ${customer.uniqueId}'),
+        elevation: 0,
+      ),
       body: Column(
         children: [
           // Summary Card
@@ -24,20 +29,22 @@ class CustomerDetailScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Total Due',
+                    NepaliStrings.totalDue,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '₨ ${customer.totalDues.toStringAsFixed(2)}',
+                    NepaliStrings.formatCurrency(customer.totalDue),
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: customer.totalDues > 0 ? Colors.red : Colors.green,
+                      color: customer.totalDue > 0
+                          ? AppTheme.errorColor
+                          : AppTheme.successColor,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${customer.transactions.length} Transactions',
+                    '${customer.transactions.length} ${NepaliStrings.transactions}',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
@@ -47,6 +54,7 @@ class CustomerDetailScreen extends StatelessWidget {
           // Transaction List
           Expanded(
             child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               itemCount: customer.transactions.length,
               itemBuilder: (context, index) {
                 final transaction = customer.transactions[index];
@@ -58,23 +66,15 @@ class CustomerDetailScreen extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          _showAddTransactionSheet(context);
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => AddTransactionForm(customerId: customer.id),
+          );
         },
-        label: const Text('Add Item'),
         icon: const Icon(Icons.add),
-      ),
-    );
-  }
-
-  void _showAddTransactionSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: AddTransactionForm(customerId: customer.id),
+        label: Text(NepaliStrings.addItem),
       ),
     );
   }
